@@ -5,7 +5,7 @@
 int main(int argc_, const char **argv_) {
     llvm::errs() << "hello llvm !\n";
     llvm::outs() << "AAAA !\n"; 
-    llvm::outs() << "bbb" << tinyhls::getTinylangVersion() << "\n";
+    llvm::outs() << "bbb" << tinyhls::getTinyHLSVersion() << "\n";
 
 
     return 0;

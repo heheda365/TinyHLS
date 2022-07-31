@@ -5,6 +5,6 @@
 #include <string>
 
 namespace tinyhls {
-std::string getTinylangVersion();
+std::string getTinyHLSVersion();
 } // namespace tinyhls
 #endif
