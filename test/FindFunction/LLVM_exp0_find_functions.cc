@@ -17,7 +17,7 @@ using namespace llvm;
 
 void ReplaceAll(std::string &strSource, const std::string &strOld, const std::string &strNew)
 {
-    int nPos = 0;
+    size_t nPos = 0;
     while ((nPos = strSource.find(strOld, nPos)) != strSource.npos)
     {
         strSource.replace(nPos, strOld.length(), strNew);
