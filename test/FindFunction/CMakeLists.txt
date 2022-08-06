@@ -1,5 +1,5 @@
 add_executable(FindFunction
-  LLVM_exp0_find_functions.cc
+  TestFindFunctions.cpp 
 )
 
 target_link_libraries(FindFunction

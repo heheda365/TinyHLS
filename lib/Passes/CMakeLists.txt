@@ -2,5 +2,7 @@
 
 add_library(
   tinyHLSPasses
-  HI_FindFunction.cc
+  CountIR.cpp 
+  FindFunction.cpp
+  DependenceList.cpp
 )

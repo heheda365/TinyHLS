@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.4.3)
 project(TinyHLS)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # setting LLVM
 find_package(LLVM REQUIRED CONFIG)
 list(APPEND CMAKE_MODULE_PATH ${LLVM_DIR})
