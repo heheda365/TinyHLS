@@ -5,4 +5,5 @@ add_library(
   CountIR.cpp 
   FindFunction.cpp
   DependenceList.cpp
+  LoopInformationCollect.cpp
 )

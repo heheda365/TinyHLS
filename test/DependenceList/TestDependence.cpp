@@ -1,18 +1,9 @@
-#include "tinyhls/Passes/FindFunction.h"
+#include "tinyhls/Passes/DependenceList.h"
 #include "tinyhls/Utils/HI_print.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/raw_ostream.h"
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <stdlib.h>
-#include <string>
-#include <system_error>
 
 using namespace llvm;
 using namespace tinyhls;
@@ -28,7 +19,7 @@ int main(int argc, char **argv) {
   SMDiagnostic Err;
   LLVMContext Context;
   std::string cmd_str =
-      "clang -O1 -emit-llvm -S " + std::string(argv[1]) + " -o top.ll";
+      "clang -fno-discard-value-names -O1 -emit-llvm -S " + std::string(argv[1]) + " -o top.ll";
   print_cmd(cmd_str.c_str());
   system(cmd_str.c_str());
 
@@ -40,21 +31,22 @@ int main(int argc, char **argv) {
 
   // Create a pass manager and fill it with the passes we want to run.
   legacy::PassManager PM;
-  FindFunctions *findFunctions = new FindFunctions();
-  
-  PM.add(findFunctions); 
+  // auto dominatortreewrapperpass = new DominatorTreeWrapperPass();
+  // PM.add(dominatortreewrapperpass); 
+
+  DependenceList *dependencePass = new DependenceList();
+  PM.add(dependencePass); 
   PM.run(*Mod);
 
-  auto functionMap = findFunctions->getFunctionDemangleMap();
-  std::error_code  errCode;
-  raw_fd_ostream ofstream("functionNameMap.txt", errCode);
+ 
+  // std::error_code  errCode;
+  // raw_fd_ostream ofstream("functionNameMap.txt", errCode);
 
-  for (auto& key: functionMap.keys()) {
-    ofstream << key << " : " << functionMap[key] << "\n"; 
-  }
+  // for (auto& key: functionMap.keys()) {
+  //   ofstream << key << " : " << functionMap[key] << "\n"; 
+  // }
 
-  ofstream.close();
+  // ofstream.close();
 
   return 0;
 }
-

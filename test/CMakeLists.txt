@@ -1,2 +1,4 @@
 add_subdirectory(BasicTest)
 add_subdirectory(FindFunction)
+add_subdirectory(DependenceList)
+add_subdirectory(LoopInformationTest)

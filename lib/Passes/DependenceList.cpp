@@ -1,189 +1,112 @@
 #include "tinyhls/Passes/DependenceList.h"
-#include "tinyhls/Utils/HI_print.h"
-#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/SourceMgr.h"
+#include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
-#include <ios>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string>
+#include <cstddef>
+#include <vector>
 
 namespace tinyhls {
 
 using namespace llvm;
 
-bool DependenceList::runOnFunction(
-    Function &F) // The runOnModule declaration will overide the virtual one in
-                 // ModulePass, which will be executed for each Module.
-{
-  *Dependence_out << "\n\n\n\n\n Printing Dominator Graph:\n";
-  auto DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  for (auto node = GraphTraits<DominatorTree *>::nodes_begin(DT);
-       node != GraphTraits<DominatorTree *>::nodes_end(DT); ++node) {
-    BasicBlock *BB = node->getBlock();
-
-    if (node->getIDom()) {
-      BasicBlock *PreBB = node->getIDom()->getBlock();
-      *Dependence_out << "Block: [" << PreBB->getName()
-                      << "] dominates Block: [" << BB->getName() << "].\n";
-    }
+template <typename T>
+void DependenceList::bindId4T(std::vector<T *> &id2T,
+                              std::map<T *, unsigned> &t2Id, T &t,
+                              unsigned &id) {
+  if (t2Id.count(&t)) {
+    id2T.push_back(&t);
+    t2Id[&t] = id;
+    id++;
   }
-  *Dependence_out << "\n\n=================\n\n\n Printed Dominator Graph:\n";
+}
 
-  if (Function_id.find(&F) ==
-      Function_id.end()) // traverse functions and assign function ID
-  {
-    Function_id[&F] = ++Function_Counter;
-  }
+bool DependenceList::runOnFunction(Function &F) {
+  bindId4T<Function>(mId2Func, mFunc2Id, F, mFuncCounter);
   for (BasicBlock &B : F) {
-    if (BasicBlock_id.find(&B) ==
-        BasicBlock_id
-            .end()) // traverse blocks in the function and assign basic block ID
-    {
-      BasicBlock_id[&B] = ++BasicBlock_Counter;
-    }
-
-    *Instruction_out << "\n B-ID: " << B.getName() << "\n";
-    *Dependence_out << "\n\n\n\n B-ID: " << B.getName() << "\n";
-    *Dependence_out << "==============================\n";
-
-    // check the relation between blocks and map them
+    bindId4T<BasicBlock>(mId2BBlock, mBBlock2Id, B, mBBlockCounter);
     checkPredecessorsOfBlock(&B);
     checkSuccessorsOfBlock(&B);
-
-    *Dependence_out << "\n==============================\n";
+    outs() << B << "\n";
     for (Instruction &I : B) {
-      // handle the dependence of current instruction
+      bindId4T<Instruction>(mId2Inst, mInst2Id, I, mInstCounter);
       checkInstructionDependence(&I);
     }
   }
   return false;
 }
 
-char DependenceList::ID =
-    0; // the ID for pass should be initialized but the value does not matter,
-       // since LLVM uses the address of this variable as label instead of its
-       // value.
+char DependenceList::ID = 0;
 
 void DependenceList::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
-  AU.addRequired<DominatorTreeWrapperPass>();
 }
 
 void DependenceList::checkSuccessorsOfBlock(BasicBlock *B) {
-  assert(Block_Successors.find(B) == Block_Successors.end() &&
-         "This Block should not be checked before");
-  *Dependence_out << "\nTerminator: " << *(B->getTerminator()) << "\n";
-  *Dependence_out << "Successor(s) are: ";
 
-  std::vector<BasicBlock *> *tmp_vec = new std::vector<BasicBlock *>;
-
-  for (auto Succ_it : successors(B)) {
-    *Dependence_out << Succ_it->getName() << "--";
-    tmp_vec->push_back(Succ_it);
+  auto tmpVec = new std::vector<BasicBlock *>();
+  for (auto succ : successors(B)) {
+    tmpVec->push_back(succ);
   }
-  Block_Successors[B] = tmp_vec;
+  mBBlockSuccessors[B] = tmpVec;
 }
 
 void DependenceList::checkPredecessorsOfBlock(BasicBlock *B) {
-  assert(Block_Predecessors.find(B) == Block_Predecessors.end() &&
-         "This Block should not be checked before");
-  *Dependence_out << "Predecessor(s) are: ";
-  std::vector<BasicBlock *> *tmp_vec = new std::vector<BasicBlock *>;
-  for (auto PreB_it : predecessors(B)) {
-    *Dependence_out << PreB_it->getName() << "--";
-    tmp_vec->push_back(PreB_it);
+
+  auto tmpVec = new std::vector<BasicBlock *>();
+  for (auto pred : predecessors(B)) {
+    tmpVec->push_back(pred);
   }
-  Block_Predecessors[B] = tmp_vec;
+  mBBlockPredecessors[B] = tmpVec;
 }
 
 void DependenceList::checkInstructionDependence(Instruction *I) {
-  if (Instruction_id.find(I) ==
-      Instruction_id
-          .end()) // traverse instructions in the block assign instruction ID
-  {
-    Instruction_id[I] = ++Instruction_Counter;
-  }
 
-  *Instruction_out << "  I-ID: " << Instruction_id[I] << " Instruction: " << *I
-                   << "\n";
-
-  std::vector<int> *tmp_vec_id;
-  if (Instruction2User_id.find(Instruction_id[I]) ==
-      Instruction2User_id.end()) // new a vector to store users
-  {
-    tmp_vec_id = new std::vector<int>;
-    Instruction2User_id[Instruction_id[I]] = tmp_vec_id;
-  } else {
-    tmp_vec_id = Instruction2User_id[Instruction_id[I]];
-  }
-
-  *Dependence_out << "  I" << Instruction_id[I] << ": " << *I << "--> ";
-
-  for (User *U : (I)->users()) // find the users of the instruction and insert
-                               // them into map
-  {
-    if (Instruction *Suc_Inst = dyn_cast<Instruction>(U)) {
-      if (Instruction_id.find(Suc_Inst) == Instruction_id.end()) {
-        Instruction_id[Suc_Inst] = ++Instruction_Counter;
-      }
-      tmp_vec_id->push_back(Instruction_id[Suc_Inst]);
-      *Dependence_out << Instruction_id[Suc_Inst] << " ";
-
-      std::vector<int> *tmp_vec_id_1; // add the instruction in the other
-                                      // instruction's presessor list
-      if (Instruction2Pre_id.find(Instruction_id[Suc_Inst]) ==
-          Instruction2Pre_id.end()) {
-        tmp_vec_id_1 = new std::vector<int>;
-        Instruction2Pre_id[Instruction_id[Suc_Inst]] = tmp_vec_id_1;
-      } else {
-        tmp_vec_id_1 = Instruction2Pre_id[Instruction_id[Suc_Inst]];
-      }
-      tmp_vec_id_1->push_back(Instruction_id[I]);
+  outs() << *I << "--> : \n";
+  // who use the result output by I
+  auto users = new std::vector<Instruction *>();
+  for (auto U : I->users()) {
+    if (auto succInst = dyn_cast<Instruction>(U)) {
+      users->push_back(succInst);
+      outs() << *succInst << "\n";
     }
   }
-  *Dependence_out << "\n\n";
-  for (int i = 0; i < I->getNumOperands(); ++i) {
-    *Dependence_out << "        op#" << i << ": " << *I->getOperand(i);
+
+  // test operands 
+  for (size_t i = 0; i < I->getNumOperands(); ++ i) {
+    outs() << "        op#" << i << ": " << *I->getOperand(i);
     if (Argument *arg = dyn_cast<Argument>(I->getOperand(i))) {
-      *Dependence_out << " is a function argument of function ("
+      outs() << " is a function argument of function ("
                       << arg->getParent()->getName() << ").";
     } else {
       if (Instruction *InstTmp = dyn_cast<Instruction>(I->getOperand(i))) {
-        *Dependence_out << " is an instruction.";
+        outs() << " is an instruction.";
       } else {
         if (Constant *constVal = dyn_cast<Constant>(I->getOperand(i))) {
-          *Dependence_out << " is a constant.";
+          outs() << " is a constant.";
         } else {
-          *Dependence_out << " is a value with unknown type.";
+          outs() << " is a value with unknown type.";
         }
       }
     }
-    *Dependence_out << " (type=";
-    I->getOperand(i)->getType()->print(*Dependence_out);
-    *Dependence_out << " is ";
+    outs() << " (type=";
+    I->getOperand(i)->getType()->print(outs());
+    outs() << " is ";
     if (I->getOperand(i)->getType()->isArrayTy()) {
-      *Dependence_out << " array type)\n";
+      outs() << " array type)\n";
     } else {
       if (I->getOperand(i)->getType()->isPointerTy()) {
-        *Dependence_out << " pointerTy type of type ";
+        outs() << " pointerTy type of type ";
         PointerType *tmp_PtrType =
             dyn_cast<PointerType>(I->getOperand(i)->getType());
-        tmp_PtrType->getElementType()->print(*Dependence_out);
-        *Dependence_out << " )\n";
+        tmp_PtrType->getElementType()->print(outs());
+        outs() << " )\n";
         // tmp_PtrType->gettype
       }
     }
 
-    *Dependence_out << ".\n";
+    outs() << ".\n";
   }
 }
 
-}   // end of namespace tinyhls
+} // end of namespace tinyhls
