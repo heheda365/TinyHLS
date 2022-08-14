@@ -3,7 +3,9 @@
 #include "tinyhls/Passes/LoopInformationCollect.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Transforms/Utils/LoopSimplify.h"
+#include <cstddef>
 #include <cstdlib>
+#include <iostream>
 #include <memory>
 
 using namespace llvm;
@@ -60,7 +62,6 @@ int main(int argc, char **argv) {
   llvm::raw_fd_ostream OS("top_output.bc", EC);
   
   OS << *Mod << "\n";
-//   llvm::WriteBitcodeToFile(*Mod, OS);
   OS.flush();
 
   OS.close();
